@@ -61,3 +61,23 @@ export function saveRoom(storage, room) {
     return true;
   } catch { return false; }
 }
+
+export function loadHostSettings(storage) {
+  try {
+    const data = JSON.parse(storage.getItem('same-scene.host-settings.v1'));
+    if (!data || typeof data !== 'object') return null;
+    const result = {};
+    for (const name of ['voice', 'camera', 'movie', 'output']) {
+      const value = data[name];
+      if (value && typeof value.id === 'string' && typeof value.label === 'string' && value.id.length < 500 && value.label.length < 300) result[name] = { id: value.id, label: value.label };
+    }
+    for (const [name, max] of [['boost', 400], ['movieVolume', 100], ['voiceVolume', 100]]) {
+      if (Number.isFinite(data[name]) && data[name] >= (name === 'boost' ? 100 : 0) && data[name] <= max) result[name] = data[name];
+    }
+    for (const name of ['monitor', 'processing']) if (typeof data[name] === 'boolean') result[name] = data[name];
+    return result;
+  } catch { return null; }
+}
+export function saveHostSettings(storage, settings) {
+  try { storage.setItem('same-scene.host-settings.v1', JSON.stringify(settings)); return true; } catch { return false; }
+}

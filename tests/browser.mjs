@@ -88,6 +88,24 @@ try {
   });
   assert.ok(audioEnergy > 10, `Expected decoded movie audio; energy=${audioEnergy}`);
   console.log('Local movie picture and decoded soundtrack received; audio signal verified.');
+  await host.waitForFunction(() => document.getElementById('movie-signal').value > 0);
+  const measureRms = async () => guest.evaluate(async () => {
+    const context = new AudioContext(); await context.resume();
+    const analyzer = context.createAnalyser(); analyzer.fftSize = 2048;
+    context.createMediaStreamSource(document.getElementById('remote-movie').srcObject).connect(analyzer);
+    const data = new Float32Array(analyzer.fftSize);
+    await new Promise(r => setTimeout(r, 500));
+    let total = 0;
+    for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 50)); analyzer.getFloatTimeDomainData(data); total += Math.sqrt(data.reduce((sum, v) => sum + v * v, 0) / data.length); }
+    await context.close(); return total / 20;
+  });
+  await host.locator('#send-boost').fill('100'); await host.locator('#send-boost').dispatchEvent('input');
+  const normalRms = await measureRms();
+  await host.locator('#send-boost').fill('200'); await host.locator('#send-boost').dispatchEvent('input');
+  const boostedRms = await measureRms();
+  assert.ok(boostedRms > normalRms * 1.5, 'Outgoing soundtrack gain should increase the guest signal');
+  assert.equal(await host.evaluate(() => JSON.parse(localStorage.getItem('same-scene.host-settings.v1')).boost), 200);
+  console.log('Audio meter detects sound; 200% send boost increases decoded guest audio and is saved.');
   await host.locator('#movie-volume').fill('20');
   await host.locator('#movie-volume').dispatchEvent('input');
   assert.equal(await guest.locator('#remote-movie').evaluate(v => v.volume), 1);
@@ -122,6 +140,36 @@ try {
   await host.locator('#movie-file').setInputFiles({ name: 'Second movie.webm', mimeType: 'video/webm', buffer: fixture });
   await guest.waitForFunction(() => document.getElementById('movie-label').textContent === 'Second movie.webm' && !document.getElementById('remote-movie').hidden && document.getElementById('remote-movie').videoWidth > 0, { timeout: 45000 });
   console.log('Stopping and replacing a movie reconnects the guest video.');
+  await host.locator('#stop-sharing').click();
+  await host.waitForFunction(() => document.getElementById('stop-sharing').hidden);
+  await host.evaluate(() => {
+    const enumerate = navigator.mediaDevices.enumerateDevices.bind(navigator.mediaDevices);
+    navigator.mediaDevices.enumerateDevices = async () => (await enumerate()).filter(d => !/blackhole|same scene movie/i.test(d.label));
+    navigator.mediaDevices.getDisplayMedia = async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 640, 360);
+      const ac = new AudioContext(); const dest = ac.createMediaStreamDestination();
+      const osc = ac.createOscillator(); const gain = ac.createGain(); gain.gain.value = 0.1;
+      osc.connect(gain).connect(dest); osc.start(); await ac.resume();
+      const picture = canvas.captureStream(5);
+      const timer = setInterval(() => { ctx.fillStyle = '#222'; ctx.fillRect(0, 0, 640, 360); }, 100);
+      picture.getVideoTracks()[0].addEventListener('ended', () => { clearInterval(timer); osc.stop(); void ac.close(); });
+      return new MediaStream([...picture.getTracks(), ...dest.stream.getTracks()]);
+    };
+    document.getElementById('movie-audio-input').value = '';
+  });
+  await host.locator('#refresh-call-devices').click();
+  await host.waitForFunction(() => !document.getElementById('refresh-call-devices').disabled);
+  await host.locator('#share-screen').click();
+  await guest.waitForFunction(() => document.getElementById('movie-label').textContent === 'Shared movie window' && document.getElementById('remote-movie').srcObject?.getAudioTracks().length && document.getElementById('remote-movie').videoWidth > 0, { timeout: 45000 });
+  await host.waitForFunction(() => document.getElementById('movie-signal').value > 0);
+  let screenRms = 0;
+  for (let attempt = 0; attempt < 5 && screenRms <= 0.05; attempt++) screenRms = await measureRms();
+  assert.ok(screenRms > 0.05, 'Screen audio should pass through the outgoing gain graph');
+  await host.locator('#stop-sharing').click();
+  await host.waitForFunction(() => document.getElementById('stop-sharing').hidden);
+  assert.equal(await host.locator('#movie-signal').evaluate(m => m.value), 0);
+  console.log('Synthetic screen soundtrack is amplified and delivered; stopping releases its capture and meter.');
   await host.locator('#toggle-camera').click();
   await guest.waitForFunction(() => document.getElementById('remote-camera').hidden, { timeout: 15000 });
   await host.locator('#leave-room').click();
@@ -136,6 +184,7 @@ try {
   assert.equal(await guest.locator('#saved-host').isVisible(), false);
   await host.locator('#resume-host').click();
   await guest.locator('#resume-guest').click();
+  assert.equal(await host.locator('#send-boost').inputValue(), '200');
   await host.waitForFunction(() => document.getElementById('connection-status').classList.contains('live'), { timeout: 45000 });
   await guest.waitForFunction(() => document.getElementById('connection-status').classList.contains('live'), { timeout: 45000 });
   const sameInvite = await host.evaluate(() => { const u = new URL(location.href); const p = new URLSearchParams(u.hash.slice(1)); p.set('as', 'guest'); u.hash = p.toString(); return u.href; });

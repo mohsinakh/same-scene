@@ -32,7 +32,7 @@ For a movie playing on a site in Firefox:
 
 1. Install [BlackHole 2ch](https://existential.audio/blackhole/). Only the host needs it.
 2. Create a Multi-Output Device in Audio MIDI Setup containing BlackHole and your headphones, with the physical output as clock source and drift correction enabled for BlackHole. [Official guide](https://github.com/ExistentialAudio/BlackHole/wiki/Multi-Output-Device).
-3. Start a room, then **Choose headphones** under Call audio output. Select the physical headphones explicitly, not System default, BlackHole or the Multi-Output Device. This uses Firefox's `selectAudioOutput()` and media-element `setSinkId()` to route received call audio away from BlackHole. Selection is required each time the app is reloaded.
+3. Start a room, then **Choose headphones** under Call audio output. Select the physical headphones explicitly, not System default, BlackHole or the Multi-Output Device. This uses Firefox's `selectAudioOutput()` and media-element `setSinkId()` to route received call audio away from BlackHole. The app saves this choice and restores it when Firefox still grants access. If permission has expired, click **Choose headphones** once to approve the saved device again.
 4. Select the Multi-Output Device as macOS sound output. The movie's normal sound now goes to headphones and BlackHole. The guest's voice goes only to the explicitly selected physical call output.
 5. In the app click **Find devices**, grant audio-input access, select BlackHole for movie audio and a physical microphone for voice. Keep **Listen to captured audio too** off because you already hear the movie.
 6. Share the movie window. Allow Firefox screen recording if macOS requests it. Keep the movie and app tabs open. Restore your normal macOS output after the session.
@@ -42,6 +42,12 @@ Other system audio may also reach BlackHole in this setup, so keep unrelated app
 For VLC, you can instead select BlackHole as VLC's audio output while keeping macOS output on headphones. Choose the physical call output in the app and enable **Listen to captured audio too** to hear the captured movie locally. Do not enable this monitor when a Multi-Output Device already plays the same movie into your headphones; you would hear it twice.
 
 Protected streaming services can block capture. This app does not bypass DRM. Live screen sharing adds delay, and the host's local playback is ahead of the received video.
+
+## Saved host audio defaults
+
+The host's device selectors, physical call output, monitor toggle, noise processing, movie/voice volume, and outgoing movie boost are saved locally. Use **Save host defaults** after choosing your inputs and headphones; later user changes also save automatically. Reopening a host room applies these preferences without turning mic or camera on. Saved device IDs are matched first, then labels, if browser permission exposes the device. A missing or unapproved output requires explicit selection again; the app does not pretend it is restored.
+
+Movie audio is sent through a separate gain stage (200% by default, adjustable from 100% to 400%) and a limiter. This boost affects the guest's soundtrack, not their voice or the host's own movie playback. A live outgoing-audio meter reports whether the captured soundtrack contains a signal. Boost cannot create sound if BlackHole receives silence. Mac system output must still route the movie to the mirrored Multi-Output Device; a website cannot set macOS's system output.
 
 ## Reusable room links
 

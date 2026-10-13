@@ -52,3 +52,15 @@ test('invalid or unavailable room storage never crashes or restores the wrong ro
   const guestHash = new URL(roomLink('https://example.com/', createRoom())).hash;
   assert.equal(loadSavedRoom({ getItem: () => guestHash }, 'host'), null);
 });
+
+test('host audio defaults retain choices and ignore malformed settings', async () => {
+  const { loadHostSettings, saveHostSettings } = await import('../core.js');
+  let value;
+  const store = { getItem: () => value, setItem: (_, v) => { value = v; } };
+  const prefs = { movie: { id: 'loopback-device', label: 'BlackHole 2ch' }, output: { id: 'phones-device', label: 'Headphones' }, boost: 200, monitor: false, processing: true, movieVolume: 100, voiceVolume: 80 };
+  assert.equal(saveHostSettings(store, prefs), true);
+  assert.deepEqual(loadHostSettings(store), prefs);
+  value = '{broken'; assert.equal(loadHostSettings(store), null);
+  value = JSON.stringify({ boost: 99999, movieVolume: -1, output: { id: 44, label: 'bad' } });
+  assert.deepEqual(loadHostSettings(store), {});
+});
