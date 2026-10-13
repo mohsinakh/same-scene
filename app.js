@@ -6,7 +6,7 @@ const state = {
   views: new Map(), incoming: new Map(), voice: null, camera: null, movie: null,
   heartbeat: null, lastSeen: 0, peer: false, movieBusy: false, audioContext: null,
   movieNode: null, movieDestination: null, movieGain: null,
-  output: null,
+  output: null, movieMuted: false, deafened: false,
 };
 let pendingInvite = null;
 
@@ -28,6 +28,8 @@ function setSelfStatus() {
   $('toggle-mic').setAttribute('aria-pressed', String(!!state.voice));
   $('toggle-camera').setAttribute('aria-pressed', String(!!state.camera));
   $('voice-input').disabled = !!state.voice;
+  $('voice-processing').disabled = !!state.voice;
+  $('camera-input').disabled = !!state.camera;
 }
 function sendState(target) {
   if (!state.joined || !state.receiver) return;
@@ -147,6 +149,13 @@ async function join(room) {
   $('room').hidden = false;
   $('create-room').disabled = true;
   const host = room.role === 'host';
+  $('room').dataset.role = room.role;
+  $('role-label').textContent = host ? 'HOST ROOM' : 'GUEST ROOM';
+  $('room-title').textContent = host ? 'Your watch room' : 'Watching together';
+  $('playback-hint').textContent = host ? 'You control playback in the movie window.' : 'Your host controls playback. Sound settings affect only you.';
+  $('pip').hidden = !document.pictureInPictureEnabled;
+  $('choose-output').hidden = !navigator.mediaDevices?.selectAudioOutput || !$('remote-voice').setSinkId;
+  $('output-label').textContent = state.output?.label || 'System default';
   $('copy-invite').hidden = !host;
   $('invite-card').hidden = !host;
   $('guest-card').hidden = host;
@@ -213,16 +222,16 @@ async function refreshDevices(requestPermission) {
   try {
     if (requestPermission) permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const devices = await navigator.mediaDevices.enumerateDevices();
-    for (const id of ['voice-input', 'movie-audio-input']) {
+    for (const id of ['voice-input', 'movie-audio-input', 'camera-input']) {
       const select = $(id), value = select.value;
       while (select.options.length > 1) select.remove(1);
-      devices.filter(d => d.kind === 'audioinput').forEach((d, i) => select.add(new Option(d.label || `Audio input ${i + 1}`, d.deviceId)));
+      devices.filter(d => d.kind === (id === 'camera-input' ? 'videoinput' : 'audioinput')).forEach((d, i) => select.add(new Option(d.label || `${id === 'camera-input' ? 'Camera' : 'Audio input'} ${i + 1}`, d.deviceId)));
       if ([...select.options].some(o => o.value === value)) select.value = value;
     }
     if (requestPermission) {
       const bh = devices.find(d => d.kind === 'audioinput' && /blackhole/i.test(d.label));
-      if (bh) { $('movie-audio-input').value = bh.deviceId; notice('BlackHole found. Route only your movie into it, then share a window.'); }
-      else notice('Devices updated. BlackHole will appear here after it is installed.');
+      if (bh && state.room?.role === 'host') { $('movie-audio-input').value = bh.deviceId; notice('BlackHole found. Route only your movie into it, then share a window.'); }
+      else notice(state.room?.role === 'host' ? 'Devices updated. BlackHole will appear here after it is installed.' : 'Microphone and camera devices updated.');
     }
   } catch (error) { if (requestPermission) notice(friendlyError(error), true); }
   finally { stopTracks(permissionStream); }
@@ -241,7 +250,7 @@ async function toggleVoice() {
         throw new Error('Choose your real microphone for voice. BlackHole belongs in the movie-audio selector.');
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: {
-        ...(input.value ? { deviceId: { exact: input.value } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+        ...(input.value ? { deviceId: { exact: input.value } } : {}), echoCancellation: $('voice-processing').checked, noiseSuppression: $('voice-processing').checked, autoGainControl: $('voice-processing').checked }, video: false });
       const client = await publish(stream, 'voice', { audio: { maxBitrate: 64000 } });
       if (state.leaving) { stopTracks(stream); await dispose(client); return; }
       state.voice = { stream, client };
@@ -259,7 +268,7 @@ async function toggleCamera() {
       stopTracks(camera.stream); await dispose(camera.client);
       $('local-camera').srcObject = null; $('local-camera').hidden = true; $('local-avatar').hidden = false;
     } else {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 20, max: 24 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { ...($('camera-input').value ? { deviceId: { exact: $('camera-input').value } } : {}), width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 20, max: 24 } }, audio: false });
       const client = await publish(stream, 'camera', { video: { maxBitrate: 500000 } });
       if (state.leaving) { stopTracks(stream); await dispose(client); return; }
       state.camera = { stream, client };
@@ -283,15 +292,24 @@ function audioGraph() {
   return state.audioContext;
 }
 function applyVolumes() {
-  const film = Number($('movie-volume').value) / 100;
+  const externalAudio = state.room?.role === 'host' && state.movie?.kind === 'screen' && !$('monitor-movie').checked;
+  $('movie-volume').disabled = $('mute-movie').disabled = !!externalAudio;
+  $('movie-volume').title = externalAudio ? 'Change movie volume in the shared movie window.' : 'Movie volume for you';
+  if (state.room?.role === 'host') $('playback-hint').textContent = externalAudio ? 'Change playback and movie volume in the shared window.' : state.movie?.kind === 'file' ? 'Use the player to pause or seek. Volume changes only what you hear.' : 'You control playback in the movie window.';
+  const film = state.movieMuted || (state.deafened && state.room?.role === 'guest') ? 0 : Number($('movie-volume').value) / 100;
   $('remote-movie').volume = film;
   if (state.movieGain) state.movieGain.gain.value = film;
   if (state.movie?.monitor) state.movie.monitor.volume = $('monitor-movie').checked ? film : 0;
-  $('remote-voice').volume = Number($('voice-volume').value) / 100;
+  $('remote-voice').volume = state.deafened ? 0 : Number($('voice-volume').value) / 100;
+  $('mute-movie').setAttribute('aria-pressed', String(state.movieMuted));
+  $('mute-movie-label').textContent = state.movieMuted ? 'Movie muted' : 'Movie sound';
+  $('deafen').setAttribute('aria-pressed', String(state.deafened));
+  $('deafen').textContent = state.deafened ? 'Unmute incoming sound' : 'Mute incoming sound';
   $('movie-volume-value').textContent = `${$('movie-volume').value}%`;
   $('voice-volume-value').textContent = `${$('voice-volume').value}%`;
 }
 function sharingUI(movie) {
+  applyVolumes();
   $('local-movie').hidden = movie?.kind !== 'file';
   $('screen-preview').hidden = movie?.kind !== 'screen';
   $('stage-empty').hidden = !!movie;
@@ -464,6 +482,18 @@ $('share-screen').addEventListener('click', () => void shareScreen());
 $('stop-sharing').addEventListener('click', async () => { movieBusy(true); try { await stopMovie(); } finally { movieBusy(false); } });
 $('refresh-devices').addEventListener('click', async () => { $('refresh-devices').disabled = true; await refreshDevices(true); $('refresh-devices').disabled = false; });
 for (const id of ['movie-volume', 'voice-volume']) $(id).addEventListener('input', applyVolumes);
+$('mute-movie').addEventListener('click', () => { state.movieMuted = !state.movieMuted; applyVolumes(); });
+$('deafen').addEventListener('click', () => { state.deafened = !state.deafened; applyVolumes(); });
+$('theater').addEventListener('click', () => { const wide = $('room').classList.toggle('theater'); $('theater').setAttribute('aria-pressed', String(wide)); });
+$('pip').addEventListener('click', async () => {
+  try {
+    if (document.pictureInPictureElement) await document.exitPictureInPicture();
+    else { const video = [$('local-movie'), $('screen-preview'), $('remote-movie')].find(v => !v.hidden && v.readyState >= 2);
+      if (!video) throw new Error('Start a movie before opening the floating player.');
+      await video.requestPictureInPicture(); }
+  } catch (error) { notice(friendlyError(error), true); }
+});
+$('refresh-call-devices').addEventListener('click', async () => { $('refresh-call-devices').disabled = true; await refreshDevices(true); $('refresh-call-devices').disabled = false; });
 $('monitor-movie').addEventListener('change', applyVolumes);
 $('choose-output').addEventListener('click', () => void chooseOutput());
 $('enable-sound').addEventListener('click', async () => {

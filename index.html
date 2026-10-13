@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#151917">
+  <meta name="theme-color" content="#111214">
   <meta name="description" content="A little cinema for two. Share a movie, hear each other, and watch together.">
   <title>Same Scene — a little cinema for two</title>
   <link rel="stylesheet" href="./styles.css">
@@ -14,7 +14,7 @@
 <body>
   <header class="masthead">
     <a class="brand" href="./" aria-label="Same Scene home"><span class="brand-mark" aria-hidden="true">◧</span> same scene<span class="brand-dot">.</span></a>
-    <div class="header-right"><span class="edition">A LITTLE CINEMA FOR TWO</span><button id="help-open" class="text-button">How it works <span aria-hidden="true">↗</span></button></div>
+    <div class="header-right"><span class="edition">WATCH TOGETHER</span><button id="help-open" class="text-button">How it works <span aria-hidden="true">↗</span></button></div>
   </header>
 
   <main>
@@ -31,7 +31,7 @@
     </section>
 
     <section id="room" class="room" hidden>
-      <div class="room-heading"><div><p class="eyebrow">TONIGHT’S LITTLE ESCAPE</p><h1>Your movie night<span class="brand-dot">.</span></h1></div><div class="room-actions"><button id="copy-invite" class="secondary" hidden>Copy invite ↗</button><button id="leave-room" class="text-button">Leave room</button></div></div>
+      <div class="room-heading"><div><p class="eyebrow"><span id="role-label">HOST ROOM</span></p><h1><span id="room-title">Watch room</span><span class="brand-dot">.</span></h1></div><div class="room-actions"><button id="copy-invite" class="secondary" hidden>Copy invite ↗</button><button id="leave-room" class="text-button">Leave room</button></div></div>
       <div id="connection-status" class="connection-status" role="status"><span class="tiny-dot"></span><span id="connection-text">Connecting…</span></div>
       <div class="cinema-layout">
         <div class="cinema-column">
@@ -42,30 +42,44 @@
             <video id="remote-movie" playsinline autoplay hidden></video>
             <div class="stage-topline"><span id="movie-label">WAITING FOR THE OPENING SCENE</span><span id="sharing-badge" hidden>● &nbsp; SHARING</span></div>
           </div>
-          <div class="playback-bar"><span id="source-caption">Your own private little cinema</span><div><button id="enable-sound" class="text-button" hidden>Enable sound</button><button id="fullscreen" class="text-button">Fullscreen ⛶</button></div></div>
+          <div class="player-controls" aria-label="Player controls">
+            <button id="mute-movie" aria-label="Mute or unmute movie sound" class="player-button" aria-pressed="false" title="Mute movie for yourself">♫ <span id="mute-movie-label">Movie sound</span></button>
+            <label class="player-volume" for="movie-volume"><span class="sr-only">Movie volume</span><input id="movie-volume" type="range" min="0" max="100" value="100"><span id="movie-volume-value">100%</span></label>
+            <span class="live-tag">LIVE</span><div class="player-spacer"></div>
+            <button id="enable-sound" class="primary" hidden>Enable sound</button>
+            <button id="theater" aria-label="Toggle wide view" class="player-button" aria-pressed="false">▭ <span>Wide view</span></button>
+            <button id="pip" aria-label="Open floating movie player" class="player-button" hidden>▣ <span>Pop out</span></button>
+            <button id="fullscreen" aria-label="Toggle fullscreen" class="player-button">⛶ <span>Fullscreen</span></button>
+          </div>
+          <div class="playback-bar"><span id="source-caption">Choose something to watch</span><span id="playback-hint">You control playback in the movie window.</span></div>
           <section id="host-tools" class="host-tools" hidden>
-            <div class="section-title"><h2>What are we watching?</h2><span>ONLY YOU SHARE THE MOVIE</span></div>
+            <div class="section-title"><h2>Share a movie</h2><span>HOST CONTROLS</span></div>
             <div class="source-choices">
               <button id="choose-file" class="source-card"><span class="source-symbol" aria-hidden="true">▤</span><strong>Play a movie file</strong><span>Picture + sound, right from Firefox.</span><span class="source-link">Choose a file →</span></button>
               <button id="share-screen" class="source-card"><span class="source-symbol" aria-hidden="true">▣</span><strong>Share a window</strong><span>For VLC, your screen, or a browser.</span><span class="source-link">Share your screen →</span></button>
             </div>
             <input id="movie-file" type="file" accept="video/*,.mkv" hidden>
-            <div id="screen-audio-panel" class="audio-panel"><label for="movie-audio-input">Movie audio for screen sharing</label><div class="input-row"><select id="movie-audio-input"><option value="">Screen audio, if supported</option></select><button id="refresh-devices" class="text-button">Find devices ↻</button></div><p id="firefox-note">Firefox needs a separate movie-audio input for screen sharing. <button id="audio-help" class="inline-button">Set up BlackHole →</button></p><label class="monitor-label"><input id="monitor-movie" type="checkbox"> Listen to captured audio too (leave off if you already hear the movie)</label></div>
+            <details id="screen-audio-panel" class="audio-panel"><summary>Screen sharing audio <span>BlackHole & monitoring</span></summary><div class="details-content"><label for="movie-audio-input">Movie audio for screen sharing</label><div class="input-row"><select id="movie-audio-input"><option value="">Screen audio, if supported</option></select><button id="refresh-devices" class="text-button">Find devices ↻</button></div><p id="firefox-note">Firefox needs a separate movie-audio input for screen sharing. <button id="audio-help" class="inline-button">Set up BlackHole →</button></p><label class="monitor-label"><input id="monitor-movie" type="checkbox"> Listen to captured audio too (leave off if you already hear the movie)</label></div></details>
             <div class="source-footer"><span id="movie-audio-status">A local movie file is the simplest way to start.</span><button id="stop-sharing" class="danger-text" hidden>Stop sharing</button></div>
           </section>
-          <div class="night-note"><span aria-hidden="true">✳</span><p>Headphones on. World off.<br><span>Keep voices clear and the movie all yours.</span></p><span class="night-number">NO. 001</span></div>
         </div>
         <aside class="people-column">
-          <section class="people-card"><div class="section-title"><h2>The two of you</h2><span>2 SEATS</span></div>
+          <section class="people-card"><div class="section-title"><h2>In this room</h2><span>2 PEOPLE</span></div>
             <div class="person-tile"><video id="remote-camera" playsinline autoplay muted hidden></video><div id="remote-avatar" class="avatar remote-avatar">✳</div><div class="person-caption"><span id="remote-name">Your person</span><span id="remote-presence">Waiting for them</span></div></div>
             <div class="person-tile self-tile"><video id="local-camera" playsinline autoplay muted hidden></video><div id="local-avatar" class="avatar">◡</div><div class="person-caption"><span>You <span class="small-muted">(preview)</span></span><span id="self-status">Mic & camera off</span></div></div>
             <div class="call-controls"><button id="toggle-mic" class="control-button" aria-pressed="false" disabled><span aria-hidden="true">♩</span><span id="mic-label">Mic off</span></button><button id="toggle-camera" class="control-button" aria-pressed="false" disabled><span aria-hidden="true">▣</span><span id="camera-label">Camera off</span></button></div>
-            <label class="device-label" for="voice-input">Your microphone</label><select id="voice-input"><option value="">Default microphone</option></select>
-            <div class="output-control"><label class="device-label">Call audio output</label><button id="choose-output" class="secondary">Choose headphones ↗</button><small id="output-label">System default</small></div>
+            <div class="voice-mixer"><label for="voice-volume">Their voice <span id="voice-volume-value">100%</span></label><input id="voice-volume" type="range" min="0" max="100" value="100"><button id="deafen" class="secondary" aria-pressed="false">Mute incoming sound</button></div>
+            <details class="device-settings" open><summary>Sound & camera settings</summary><div class="details-content">
+              <label class="device-label" for="voice-input">Your microphone</label><select id="voice-input"><option value="">Default microphone</option></select>
+              <label class="device-label" for="camera-input">Your camera</label><select id="camera-input"><option value="">Default camera</option></select>
+              <label class="monitor-label"><input id="voice-processing" type="checkbox" checked> Reduce echo & background noise</label>
+              <small>Turn your mic or camera off before changing its device.</small>
+              <button id="refresh-call-devices" class="text-button">Refresh devices ↻</button>
+              <div class="output-control"><label class="device-label">Headphones / sound output</label><button id="choose-output" class="secondary">Choose headphones ↗</button><small id="output-label">System default</small></div>
+            </div></details>
           </section>
-          <section class="volume-card"><h2>Make yourself comfortable</h2><label for="movie-volume">Movie <span id="movie-volume-value">100%</span></label><input id="movie-volume" type="range" min="0" max="100" value="100"><label for="voice-volume">Their voice <span id="voice-volume-value">100%</span></label><input id="voice-volume" type="range" min="0" max="100" value="100"><p>These change only what you hear.</p></section>
-          <div id="invite-card" class="invite-card" hidden><span class="eyebrow">ONE SEAT RESERVED</span><p>Good movies need<br><em>good company.</em></p><button id="copy-invite-card" class="text-button">Copy their invite ↗</button><small>Keep this link between the two of you.</small></div>
-          <div id="guest-card" class="invite-card" hidden><span class="eyebrow">YOU’RE IN GOOD COMPANY</span><p>Settle in.<br><em>You’re invited.</em></p><small>The host controls the movie. Your mic and camera are always your choice.</small></div>
+          <div id="invite-card" class="invite-card" hidden><span class="eyebrow">INVITE YOUR PERSON</span><p>One link.<br>One movie night.</p><button id="copy-invite-card" class="text-button">Copy their invite ↗</button><small>Keep this link between the two of you.</small></div>
+          <div id="guest-card" class="invite-card" hidden><span class="eyebrow">GUEST CONTROLS</span><p>Your seat is ready.</p><small>Your host shares and controls the movie. Adjust your own sound, microphone, and camera here.</small></div>
         </aside>
       </div>
       <audio id="remote-voice" autoplay hidden></audio>
@@ -75,7 +89,7 @@
   <footer class="site-footer"><span>MADE FOR A NIGHT IN, TOGETHER.</span><span>Private invite · WebRTC · Powered by <a href="https://vdo.ninja/" target="_blank" rel="noopener noreferrer">VDO.Ninja</a></span></footer>
   <dialog id="help-dialog"><div class="dialog-heading"><span class="eyebrow">A QUICK GUIDE</span><button id="help-close" class="text-button" aria-label="Close guide">×</button></div><h2>A little setup.<br>A whole movie night.</h2>
     <h3>Start with a movie file</h3><p>On your Mac in Firefox, start a room, copy the invite, and choose a local movie file. MP4 with H.264 video and AAC audio is a good first choice. Use the player’s play, pause, and seek controls. The file stays on your device; live picture and sound go to your guest. Files your browser cannot decode need VLC + screen sharing instead.</p>
-    <h3>Share a movie playing on a Firefox site</h3><ol><li>Install the free <a href="https://existential.audio/blackhole/" target="_blank" rel="noopener noreferrer">BlackHole 2ch driver</a>. Restart your Mac if it is not listed in Audio MIDI Setup.</li><li>In Audio MIDI Setup create a Multi-Output Device containing BlackHole and your headphones. Use the physical output as clock source and enable drift correction for BlackHole. <a href="https://github.com/ExistentialAudio/BlackHole/wiki/Multi-Output-Device" target="_blank" rel="noopener noreferrer">Setup guide ↗</a></li><li>In this app, click “Choose headphones” under Call audio output and select the physical headphones or speakers, not System default, BlackHole or the Multi-Output Device. This keeps your guest’s voice out of the movie audio.</li><li>Choose the Multi-Output Device as your Mac’s sound output. The movie tab now plays into your headphones and BlackHole. Other system sound can also be captured; keep unrelated apps quiet.</li><li>Click “Find devices”, allow audio-input access, and select BlackHole 2ch under movie audio. Keep your real microphone selected under “Your microphone”. Leave “Listen to captured audio too” off, since you already hear the movie.</li><li>Click “Share a window” and select the movie window. Allow Firefox screen recording in macOS settings if needed. Keep the movie and app tabs open.</li><li>After movie night, restore your Mac’s sound output to your normal headphones.</li></ol>
+    <h3>Share a movie playing on a Firefox site</h3><ol><li>Install the free <a href="https://existential.audio/blackhole/" target="_blank" rel="noopener noreferrer">BlackHole 2ch driver</a>. Restart your Mac if it is not listed in Audio MIDI Setup.</li><li>In Audio MIDI Setup create a Multi-Output Device containing BlackHole and your headphones. Use the physical output as clock source and enable drift correction for BlackHole. <a href="https://github.com/ExistentialAudio/BlackHole/wiki/Multi-Output-Device" target="_blank" rel="noopener noreferrer">Setup guide ↗</a></li><li>In this app, click “Choose headphones” under Headphones / sound output and select the physical headphones or speakers, not System default, BlackHole or the Multi-Output Device. This keeps your guest’s voice out of the movie audio.</li><li>Choose the Multi-Output Device as your Mac’s sound output. The movie tab now plays into your headphones and BlackHole. Other system sound can also be captured; keep unrelated apps quiet.</li><li>Click “Find devices”, allow audio-input access, and select BlackHole 2ch under movie audio. Keep your real microphone selected under “Your microphone”. Leave “Listen to captured audio too” off, since you already hear the movie.</li><li>Click “Share a window” and select the movie window. Allow Firefox screen recording in macOS settings if needed. Keep the movie and app tabs open.</li><li>After movie night, restore your Mac’s sound output to your normal headphones.</li></ol>
     <p class="help-note">For VLC, you can instead send VLC’s output directly to BlackHole while leaving macOS output on your headphones. Enable “Listen to captured audio too” if you cannot hear VLC locally. Only the host needs BlackHole. Local movie-file playback needs no driver.</p>
     <h3>Your guest</h3><p>They open the invite in Chrome on Windows or Android and tap “Join movie night”. They can turn their microphone and camera on independently. Keep the browser open and the phone unlocked; backgrounding Chrome may interrupt playback or the call. On a phone, use landscape fullscreen for the movie.</p>
     <h3>Privacy & connection</h3><p>One host and one guest are supported in this first version. Anyone with the full invite can join, so share it privately. Roles are for a trusted pair, not account authentication. Create a new room to get a new invite. Media is encrypted in transit using WebRTC. VDO.Ninja supplies hosted signaling and, when needed, relay servers; availability and service limits apply. Direct peers can learn each other’s network addresses.</p>
