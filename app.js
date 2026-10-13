@@ -1,4 +1,4 @@
-import { createRoom, parseRoom, roomLink, allowedStreams, discoverIds, friendlyError } from './core.js';
+import { createRoom, parseRoom, roomLink, allowedStreams, discoverIds, friendlyError, loadSavedRoom, saveRoom } from './core.js';
 
 const $ = id => document.getElementById(id);
 const state = {
@@ -9,6 +9,24 @@ const state = {
   output: null, movieMuted: false, deafened: false,
 };
 let pendingInvite = null;
+let savedHost = null, savedGuest = null;
+function readSavedRooms() {
+  try {
+    savedHost = loadSavedRoom(localStorage, 'host');
+    savedGuest = loadSavedRoom(localStorage, 'guest');
+  } catch { savedHost = savedGuest = null; }
+  $('saved-rooms').hidden = !savedHost && !savedGuest;
+  $('saved-host').hidden = !savedHost;
+  $('saved-guest').hidden = !savedGuest;
+  $('create-room').textContent = savedHost ? 'Open your watch room →' : 'Start a movie night ↗';
+}
+function rememberRoom(room) {
+  let saved = false;
+  try { saved = saveRoom(localStorage, room); } catch { /* Bookmarks still work with blocked storage. */ }
+  readSavedRooms();
+  if (!saved) notice('This browser cannot save your room. Bookmark this page or copy your link to return next time.');
+}
+
 
 function notice(message, error = false) {
   $('notice-message').textContent = message;
@@ -189,6 +207,7 @@ async function join(room) {
     await receiver.joinRoom({ room: room.room });
     await receiver.announce({ streamID: `${room.role}_control` });
     state.joined = true;
+    rememberRoom(room);
     // Room listings arrive before announce resolves. Revisit the SDK's known streams.
     await discover({ list: [...receiver.streams.keys()] });
     connection(host ? 'Room ready. Invite your person to join.' : 'Room ready. Waiting for your host…');
@@ -453,13 +472,20 @@ async function leave(clearURL = true) {
   if (clearURL) history.replaceState(null, '', location.pathname + location.search);
   state.leaving = false;
 }
-async function copyInvite() {
-  const link = roomLink(location.href, state.room);
-  try { await navigator.clipboard.writeText(link); notice('Invite copied. Send it to your person.'); }
+async function copyInvite(room = state.room, role = 'guest') {
+  const link = roomLink(location.href, room, role);
+  try { await navigator.clipboard.writeText(link); notice(role === 'host' ? 'Your host link is copied. Save it for yourself to reopen this room.' : 'Permanent guest invite copied. Share it once and reuse it every movie night.'); }
   catch { $('invite-input').value = link; notice('Clipboard access was blocked. Your invite is available in the link box when you leave this room.', true); }
 }
 
-$('create-room').addEventListener('click', () => void join(createRoom()));
+$('create-room').addEventListener('click', () => void join(savedHost || createRoom()));
+$('create-new-room').addEventListener('click', () => void join(createRoom()));
+$('resume-host').addEventListener('click', () => { if (savedHost) void join(savedHost); });
+$('resume-guest').addEventListener('click', () => { if (savedGuest) void join(savedGuest); });
+$('copy-saved-invite').addEventListener('click', () => { if (savedHost) void copyInvite(savedHost); });
+$('copy-host-link').addEventListener('click', () => void copyInvite(state.room, 'host'));
+window.addEventListener('storage', readSavedRooms);
+readSavedRooms();
 $('join-invite').addEventListener('click', () => {
   try {
     const value = $('invite-input').value.trim();

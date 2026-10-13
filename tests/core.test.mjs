@@ -26,3 +26,29 @@ test('all SDK room-discovery event forms are supported', () => {
   assert.deepEqual(discoverIds({ streamID: 'guest_camera' }), ['guest_camera']);
   assert.deepEqual(discoverIds({ list: [null, {}] }), []);
 });
+
+test('saved host and guest seats survive reload independently', async () => {
+  const { saveRoom, loadSavedRoom } = await import('../core.js');
+  const values = new Map();
+  const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+  const host = createRoom(), guest = { ...createRoom(), role: 'guest' };
+  assert.equal(saveRoom(storage, host), true);
+  assert.equal(saveRoom(storage, guest), true);
+  assert.deepEqual(loadSavedRoom(storage, 'host'), host);
+  assert.deepEqual(loadSavedRoom(storage, 'guest'), guest);
+  assert.equal(roomLink('https://example.com/', loadSavedRoom(storage, 'host')), roomLink('https://example.com/', host));
+  const nextHost = createRoom();
+  saveRoom(storage, nextHost);
+  assert.deepEqual(loadSavedRoom(storage, 'host'), nextHost);
+  assert.deepEqual(loadSavedRoom(storage, 'guest'), guest);
+  assert.deepEqual(parseRoom(new URL(roomLink('https://example.com/', host)).hash), { ...host, role: 'guest' });
+});
+test('invalid or unavailable room storage never crashes or restores the wrong role', async () => {
+  const { saveRoom, loadSavedRoom } = await import('../core.js');
+  const blocked = { getItem() { throw Error('blocked'); }, setItem() { throw Error('blocked'); } };
+  assert.equal(loadSavedRoom(blocked, 'host'), null);
+  assert.equal(saveRoom(blocked, createRoom()), false);
+  assert.equal(loadSavedRoom({ getItem: () => '#r=bad&k=bad' }, 'host'), null);
+  const guestHash = new URL(roomLink('https://example.com/', createRoom())).hash;
+  assert.equal(loadSavedRoom({ getItem: () => guestHash }, 'host'), null);
+});

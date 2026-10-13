@@ -42,3 +42,22 @@ export function friendlyError(error) {
   };
   return messages[error?.name] || error?.message || 'Something went wrong. Please try again.';
 }
+
+// Store host and guest seats separately so following an invite never replaces a host room.
+const savedRoomKey = role => `same-scene.saved-room.v1.${role}`;
+export function loadSavedRoom(storage, role) {
+  try {
+    const hash = storage.getItem(savedRoomKey(role));
+    const room = hash ? parseRoom(hash) : null;
+    return room?.role === role ? room : null;
+  } catch { return null; }
+}
+export function saveRoom(storage, room) {
+  try {
+    const hash = new URL(roomLink('https://same-scene.invalid/', room, room.role)).hash;
+    const valid = parseRoom(hash);
+    if (!valid || valid.role !== room.role) return false;
+    storage.setItem(savedRoomKey(room.role), hash);
+    return true;
+  } catch { return false; }
+}

@@ -17,7 +17,7 @@ Open http://127.0.0.1:4173. Camera/mic capture needs HTTPS or localhost. A local
 
 ### Local movie file (simplest)
 
-1. Start a movie night and send the guest invite.
+1. Start a movie night and send the permanent guest invite. Your browser remembers the room; **Open your watch room** reopens it next time.
 2. Choose a movie file that Firefox can decode. H.264/AAC in MP4 is a good starting point. Container names alone do not guarantee codec support.
 3. Play, pause, or seek using the native player. The app draws live frames to a canvas and sends video plus a Web Audio track using WebRTC. The movie file is not uploaded to hosting or signaling.
 4. Keep the host's tab visible. Browser background throttling, sleep, and a locked device can interrupt the live stream.
@@ -42,6 +42,12 @@ Other system audio may also reach BlackHole in this setup, so keep unrelated app
 For VLC, you can instead select BlackHole as VLC's audio output while keeping macOS output on headphones. Choose the physical call output in the app and enable **Listen to captured audio too** to hear the captured movie locally. Do not enable this monitor when a Multi-Output Device already plays the same movie into your headphones; you would hear it twice.
 
 Protected streaming services can block capture. This app does not bypass DRM. Live screen sharing adds delay, and the host's local playback is ahead of the received video.
+
+## Reusable room links
+
+Guest invites and host links have no built-in expiry. Closing or leaving ends captures without deleting the room credentials. The home page remembers the latest successfully joined host room and guest seat independently in `localStorage`; following a guest invite does not replace your saved host room. **Copy my host link** provides a portable backup for bookmarks or another browser. Browser storage can be cleared or blocked, so keep the links if you want to retain the room independently of this browser. Credentials remain in URL fragments and local browser storage; no room database is needed.
+
+**Create a different room** replaces the remembered host room with a new one after connecting, but existing links remain usable. It does not revoke access to the old room. The host must return and start sharing for the guest to see a movie. Capture permissions and audio routing are set up again each session. Connections still depend on the hosted signaling service being available.
 
 ## Guest on Android or Windows
 
