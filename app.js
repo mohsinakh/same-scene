@@ -38,15 +38,24 @@ async function setOutput(device) {
   state.output = device;
   $('output-label').textContent = device.label || 'Selected physical output';
 }
+async function requestSavedHostOutput() {
+  if (!navigator.mediaDevices?.selectAudioOutput || !hostDefaults?.output) return;
+  try {
+    const device = await navigator.mediaDevices.selectAudioOutput({ deviceId: hostDefaults.output.id });
+    await setOutput(device);
+    hostDefaults.output = { id: device.deviceId, label: device.label };
+    try { saveHostSettings(localStorage, hostDefaults); } catch {}
+  } catch { $('output-label').textContent = `${hostDefaults.output.label} — permission needed`; }
+}
 async function restoreHostOutput() {
-  if (state.room?.role !== 'host' || !hostDefaults?.output || !$('remote-voice').setSinkId) return;
+  if (state.room?.role !== 'host' || state.output || !hostDefaults?.output || !$('remote-voice').setSinkId) return;
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const saved = hostDefaults.output;
     const device = devices.find(d => d.kind === 'audiooutput' && d.deviceId === saved.id) || devices.find(d => d.kind === 'audiooutput' && d.label === saved.label);
     if (!device) throw new Error('Saved headphones are unavailable');
     await setOutput(device);
-  } catch { state.output = null; $('output-label').textContent = 'Saved headphones need access — click Choose headphones'; }
+  } catch { state.output = null; $('output-label').textContent = `${hostDefaults.output.label} — click Choose headphones to allow access`; }
 }
 
 let savedHost = null, savedGuest = null;
@@ -220,6 +229,8 @@ async function join(room) {
   $('stage-description').textContent = host ? 'Choose a movie below. Your person gets the front-row seat.' : 'Your host will share the movie here. Settle in while they choose.';
   history.replaceState(null, '', roomLink(location.href, room, room.role));
   connection('Connecting to the room…');
+  // Re-authorize the saved output during the Join click; Firefox can reuse or preselect it.
+  const savedOutputReady = host && hostDefaults?.output ? requestSavedHostOutput() : null;
   try {
     if (!window.isSecureContext || !navigator.mediaDevices) throw new Error('Open this app over HTTPS or localhost to enable audio and video.');
     const receiver = sdk();
@@ -268,6 +279,7 @@ async function join(room) {
     // Listing devices does not request access. Labels appear after explicit permission.
     applyHostDefaults();
     await refreshDevices(false);
+    if (savedOutputReady) await savedOutputReady;
     await restoreHostOutput();
   } catch (error) {
     notice(friendlyError(error), true);
@@ -287,6 +299,7 @@ async function refreshDevices(requestPermission) {
       const preferred = state.room?.role === 'host' ? hostDefaults?.[id === 'voice-input' ? 'voice' : id === 'camera-input' ? 'camera' : 'movie'] : null;
       const choice = [...select.options].find(o => preferred?.id && o.value === preferred.id) || [...select.options].find(o => preferred?.label && o.textContent === preferred.label && o.value);
       if (choice) select.value = choice.value;
+      else if (preferred?.id && preferred.label) { select.add(new Option(preferred.label, preferred.id)); select.value = preferred.id; }
       else if ([...select.options].some(o => o.value === value)) select.value = value;
       if (state.room?.role === 'host' && id === 'movie-audio-input' && !select.value && !preferred?.id) {
         const blackhole = [...select.options].find(o => /blackhole/i.test(o.textContent));
