@@ -6,6 +6,7 @@ const state = {
   views: new Map(), incoming: new Map(), voice: null, camera: null, movie: null,
   heartbeat: null, lastSeen: 0, peer: false, movieBusy: false, audioContext: null,
   movieNode: null, movieDestination: null, movieGain: null,
+  output: null,
 };
 let pendingInvite = null;
 
@@ -60,6 +61,24 @@ async function tryPlay(element) {
   catch (error) {
     if (error.name === 'NotAllowedError') $('enable-sound').hidden = false;
   }
+}
+async function chooseOutput() {
+  try {
+    if (!navigator.mediaDevices?.selectAudioOutput || !$('remote-voice').setSinkId) {
+      throw new Error('This browser cannot choose call output. Use current Firefox on your Mac, or keep system output on headphones and route only the movie player into BlackHole.');
+    }
+    const device = await navigator.mediaDevices.selectAudioOutput();
+    if (!device.deviceId || device.deviceId === 'default' || /blackhole|multi.?output|system default|same scene movie/i.test(device.label)) {
+      throw new Error('Choose physical headphones or speakers. System default, BlackHole and Multi-Output would send the call back into the movie.');
+    }
+    await $('remote-voice').setSinkId(device.deviceId);
+    await $('remote-movie').setSinkId(device.deviceId);
+    if (state.movie?.monitor) await state.movie.monitor.setSinkId(device.deviceId);
+    state.output = device;
+    $('remote-voice').muted = false;
+    $('output-label').textContent = device.label || 'Selected physical output';
+    notice('Call audio goes directly to your selected headphones. Movie audio can now go into BlackHole separately.');
+  } catch (error) { notice(friendlyError(error), true); }
 }
 function receiveTrack({ streamID, track }) {
   if (!allowedStreams(state.room.role).includes(streamID) || streamID.endsWith('_control')) return;
@@ -267,7 +286,7 @@ function applyVolumes() {
   const film = Number($('movie-volume').value) / 100;
   $('remote-movie').volume = film;
   if (state.movieGain) state.movieGain.gain.value = film;
-  if (state.movie?.monitor) state.movie.monitor.volume = film;
+  if (state.movie?.monitor) state.movie.monitor.volume = $('monitor-movie').checked ? film : 0;
   $('remote-voice').volume = Number($('voice-volume').value) / 100;
   $('movie-volume-value').textContent = `${$('movie-volume').value}%`;
   $('voice-volume-value').textContent = `${$('voice-volume').value}%`;
@@ -357,6 +376,10 @@ async function shareScreen() {
   movieBusy(true);
   let movie;
   try {
+    const selected = $('movie-audio-input').selectedOptions[0]?.textContent || '';
+    if (/Firefox\//.test(navigator.userAgent) && /blackhole/i.test(selected) && !state.output) {
+      throw new Error('First choose your physical headphones under Call audio output. This keeps your guest’s voice out of BlackHole.');
+    }
     // Capture is invoked before an await to retain the click's user activation.
     const capturePromise = navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: true });
     const captured = await capturePromise;
@@ -370,7 +393,8 @@ async function shareScreen() {
       audioTracks = audio.getAudioTracks();
       movie.monitor = new Audio();
       movie.monitor.srcObject = audio;
-      movie.monitor.volume = Number($('movie-volume').value) / 100;
+      movie.monitor.volume = $('monitor-movie').checked ? Number($('movie-volume').value) / 100 : 0;
+      if (state.output && movie.monitor.setSinkId) await movie.monitor.setSinkId(state.output.deviceId);
       await tryPlay(movie.monitor);
     }
     movie.stream = new MediaStream([...captured.getVideoTracks(), ...audioTracks]);
@@ -440,6 +464,8 @@ $('share-screen').addEventListener('click', () => void shareScreen());
 $('stop-sharing').addEventListener('click', async () => { movieBusy(true); try { await stopMovie(); } finally { movieBusy(false); } });
 $('refresh-devices').addEventListener('click', async () => { $('refresh-devices').disabled = true; await refreshDevices(true); $('refresh-devices').disabled = false; });
 for (const id of ['movie-volume', 'voice-volume']) $(id).addEventListener('input', applyVolumes);
+$('monitor-movie').addEventListener('change', applyVolumes);
+$('choose-output').addEventListener('click', () => void chooseOutput());
 $('enable-sound').addEventListener('click', async () => {
   await state.audioContext?.resume();
   const elements = [$('remote-movie'), $('remote-voice'), state.movie?.monitor].filter(Boolean).filter(e => e.srcObject);
