@@ -1,0 +1,116 @@
+// Optional integration check: install Playwright or pass PLAYWRIGHT_PATH.
+// Uses synthetic mic/camera and a generated movie; never captures real devices.
+import { createRequire } from 'node:module';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+const require = createRequire(import.meta.url);
+const { chromium, firefox } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const engine = process.env.TEST_FIREFOX === '1' ? firefox : chromium;
+const browser = await engine.launch({ headless: true, executablePath: process.env.TEST_FIREFOX === '1' ? undefined : process.env.CHROMIUM_PATH || undefined,
+  firefoxUserPrefs: { 'media.navigator.streams.fake': true, 'media.navigator.permission.disabled': true, 'media.autoplay.default': 0 },
+  args: process.env.TEST_FIREFOX === '1' ? [] : ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+const guestBrowser = process.env.TEST_FIREFOX === '1' ? await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || undefined,
+  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'] }) : browser;
+const errors = [];
+const base = process.env.APP_URL || 'http://127.0.0.1:4173/';
+await mkdir(new URL('../test-results/', import.meta.url), { recursive: true });
+try {
+  const permissions = process.env.TEST_FIREFOX === '1' ? [] : ['camera', 'microphone'];
+  const hostContext = await browser.newContext({ permissions, viewport: { width: 1440, height: 1000 } });
+  const guestContext = await guestBrowser.newContext({ permissions: ['camera', 'microphone'], viewport: { width: 1280, height: 900 } });
+  const host = await hostContext.newPage();
+  const guest = await guestContext.newPage();
+  for (const page of [host, guest]) page.on('pageerror', e => errors.push(e.message));
+  await host.goto(base);
+  await host.screenshot({ path: fileURLToPath(new URL('../test-results/lobby.png', import.meta.url)), fullPage: true });
+  await host.locator('#create-room').click();
+  await host.waitForFunction(() => !document.getElementById('toggle-mic').disabled, { timeout: 45000 });
+  console.log('Host signaling ready; permissions start off.');
+  assert.equal(await host.locator('#toggle-mic').getAttribute('aria-pressed'), 'false');
+  const invite = await host.evaluate(() => { const u = new URL(location.href); const p = new URLSearchParams(u.hash.slice(1)); p.set('as', 'guest'); u.hash = p.toString(); return u.href; });
+  await guest.goto(invite);
+  await guest.locator('#accept-invite').click();
+  await guest.waitForFunction(() => !document.getElementById('toggle-mic').disabled, { timeout: 45000 });
+  await host.waitForFunction(() => document.getElementById('connection-status').classList.contains('live'), { timeout: 45000 });
+  await guest.waitForFunction(() => document.getElementById('connection-status').classList.contains('live'), { timeout: 45000 });
+  assert.equal(await guest.locator('#host-tools').isVisible(), false);
+  console.log('Two independent peers connected through live VDO.Ninja signaling.');
+  await host.locator('#toggle-mic').click();
+  await guest.waitForFunction(() => document.getElementById('remote-voice').srcObject?.getAudioTracks().some(t => t.readyState === 'live'), { timeout: 45000 });
+  await guest.locator('#toggle-mic').click();
+  await host.waitForFunction(() => document.getElementById('remote-voice').srcObject?.getAudioTracks().some(t => t.readyState === 'live'), { timeout: 45000 });
+  console.log('Microphone audio received in both directions.');
+  await host.locator('#toggle-camera').click();
+  await guest.waitForFunction(() => document.getElementById('remote-camera').videoWidth > 0, { timeout: 45000 });
+  await guest.locator('#toggle-camera').click();
+  await host.waitForFunction(() => document.getElementById('remote-camera').videoWidth > 0, { timeout: 45000 });
+  console.log('Optional cameras received in both directions.');
+  // Generate a tiny actual video+audio file in the browser, without external media.
+  const bytes = await host.evaluate(async () => {
+    const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 360;
+    const ctx = canvas.getContext('2d');
+    const ac = new AudioContext(); await ac.resume();
+    const dest = ac.createMediaStreamDestination(); const oscillator = ac.createOscillator(); oscillator.frequency.value = 440;
+    const gain = ac.createGain(); gain.gain.value = 0.2; oscillator.connect(gain).connect(dest); oscillator.start();
+    const stream = new MediaStream([...canvas.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8,opus' });
+    const parts = []; recorder.ondataavailable = e => parts.push(e.data);
+    const done = new Promise(resolve => recorder.onstop = resolve);
+    recorder.start();
+    const timer = setInterval(() => { ctx.fillStyle = '#ba633e'; ctx.fillRect(0, 0, 640, 360); ctx.fillStyle = '#fff'; ctx.font = '32px sans-serif'; ctx.fillText('Same Scene test movie', 60, 180); }, 33);
+    await new Promise(resolve => setTimeout(resolve, 1800)); recorder.stop(); await done;
+    clearInterval(timer); oscillator.stop(); stream.getTracks().forEach(t => t.stop()); await ac.close();
+    return [...new Uint8Array(await new Blob(parts, { type: recorder.mimeType }).arrayBuffer())];
+  });
+  const fixture = Buffer.from(bytes);
+  await writeFile(new URL('../test-results/movie.webm', import.meta.url), fixture);
+  await host.evaluate(() => { document.getElementById('local-movie').loop = true; });
+  await host.locator('#movie-file').setInputFiles({ name: 'Test movie.webm', mimeType: 'video/webm', buffer: fixture });
+  await guest.waitForFunction(() => {
+    const v = document.getElementById('remote-movie');
+    return v.videoWidth > 0 && v.srcObject?.getAudioTracks().some(t => t.readyState === 'live');
+  }, { timeout: 45000 });
+  const audioEnergy = await guest.evaluate(async () => {
+    const context = new AudioContext(); await context.resume();
+    const stream = document.getElementById('remote-movie').srcObject;
+    const analyzer = context.createAnalyser(); analyzer.fftSize = 2048;
+    context.createMediaStreamSource(stream).connect(analyzer);
+    const array = new Uint8Array(analyzer.frequencyBinCount);
+    let peak = 0;
+    for (let i = 0; i < 12; i++) { await new Promise(r => setTimeout(r, 100)); analyzer.getByteFrequencyData(array); peak = Math.max(peak, ...array); }
+    await context.close(); return peak;
+  });
+  assert.ok(audioEnergy > 10, `Expected decoded movie audio; energy=${audioEnergy}`);
+  console.log('Local movie picture and decoded soundtrack received; audio signal verified.');
+  await host.locator('#movie-volume').fill('20');
+  await host.locator('#movie-volume').dispatchEvent('input');
+  assert.equal(await guest.locator('#remote-movie').evaluate(v => v.volume), 1);
+  await guest.locator('#voice-volume').fill('35');
+  await guest.locator('#voice-volume').dispatchEvent('input');
+  assert.equal(await guest.locator('#remote-voice').evaluate(v => v.volume), 0.35);
+  await host.locator('#toggle-mic').click();
+  await guest.waitForFunction(() => document.getElementById('remote-presence').textContent === 'Mic off', { timeout: 15000 });
+  assert.equal(await guest.locator('#remote-movie').isVisible(), true);
+  await host.locator('#toggle-mic').click();
+  await guest.waitForFunction(() => document.getElementById('remote-presence').textContent === 'Mic on', { timeout: 20000 });
+  console.log('Independent volume and mic off/on work while the movie continues.');
+  await host.screenshot({ path: fileURLToPath(new URL('../test-results/room-desktop.png', import.meta.url)), fullPage: true });
+  await guest.setViewportSize({ width: 390, height: 844 });
+  await guest.screenshot({ path: fileURLToPath(new URL('../test-results/room-mobile.png', import.meta.url)), fullPage: true });
+  assert.ok(await guest.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await host.locator('#stop-sharing').click();
+  await host.waitForFunction(() => document.getElementById('stop-sharing').hidden, { timeout: 15000 });
+  await host.locator('#movie-file').setInputFiles({ name: 'Second movie.webm', mimeType: 'video/webm', buffer: fixture });
+  await guest.waitForFunction(() => document.getElementById('movie-label').textContent === 'Second movie.webm' && !document.getElementById('remote-movie').hidden && document.getElementById('remote-movie').videoWidth > 0, { timeout: 45000 });
+  console.log('Stopping and replacing a movie reconnects the guest video.');
+  await host.locator('#toggle-camera').click();
+  await guest.waitForFunction(() => document.getElementById('remote-camera').hidden, { timeout: 15000 });
+  await host.locator('#leave-room').click();
+  await host.waitForFunction(() => !document.getElementById('lobby').hidden, { timeout: 15000 });
+  assert.equal(await host.locator('#local-camera').evaluate(v => v.srcObject), null);
+  await guest.locator('#leave-room').click();
+  await guest.waitForFunction(() => !document.getElementById('lobby').hidden, { timeout: 15000 });
+  assert.deepEqual(errors, []);
+  console.log('Camera off, movie replacement, leave cleanup and mobile layout passed. No page errors.');
+} finally { await browser.close(); if (guestBrowser !== browser) await guestBrowser.close(); }

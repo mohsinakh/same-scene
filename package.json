@@ -1,0 +1,11 @@
+{
+  "name": "same-scene",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "check": "node --check app.js && node --check core.js && node --test tests/core.test.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}

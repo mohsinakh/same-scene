@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#151917">
+  <meta name="description" content="A little cinema for two. Share a movie, hear each other, and watch together.">
+  <title>Same Scene — a little cinema for two</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./vendor/vdoninja-sdk.js"></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="./" aria-label="Same Scene home"><span class="brand-mark" aria-hidden="true">◧</span> same scene<span class="brand-dot">.</span></a>
+    <div class="header-right"><span class="edition">A LITTLE CINEMA FOR TWO</span><button id="help-open" class="text-button">How it works <span aria-hidden="true">↗</span></button></div>
+  </header>
+
+  <main>
+    <section id="lobby" class="lobby">
+      <div class="lobby-copy"><p class="eyebrow"><span class="tiny-dot"></span> DIFFERENT PLACES. SAME SCENE.</p>
+        <h1>Movie night.<br>With your <em>person.</em></h1>
+        <p class="intro">Pick something good. Send them a seat.<br>See their smile. Hear their laugh. Stay a little longer.</p>
+        <button id="create-room" class="primary large">Start a movie night <span aria-hidden="true">↗</span></button>
+        <p class="subtle">Free to use · No account needed · Just the two of you</p>
+        <div class="join-form"><label for="invite-input">Already have an invite?</label><div><input id="invite-input" type="url" placeholder="Paste your movie-night link" autocomplete="off"><button id="join-invite" class="secondary">Join →</button></div></div>
+      </div>
+      <div class="poster" aria-hidden="true"><div class="poster-grain"></div><div class="poster-top">YOUR SEAT IS SAVED <span>02</span></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="poster-title">A film.<br>Two places.<br><em>One night.</em></div><div class="poster-bottom"><span>STARRING<br>YOU & YOUR PERSON</span><span>NOW SHOWING<br>WHEREVER YOU ARE</span></div></div>
+      <div class="lobby-foot"><span>01 &nbsp; PICK A MOVIE</span><span>02 &nbsp; INVITE YOUR PERSON</span><span>03 &nbsp; PRESS PLAY</span></div>
+    </section>
+
+    <section id="room" class="room" hidden>
+      <div class="room-heading"><div><p class="eyebrow">TONIGHT’S LITTLE ESCAPE</p><h1>Your movie night<span class="brand-dot">.</span></h1></div><div class="room-actions"><button id="copy-invite" class="secondary" hidden>Copy invite ↗</button><button id="leave-room" class="text-button">Leave room</button></div></div>
+      <div id="connection-status" class="connection-status" role="status"><span class="tiny-dot"></span><span id="connection-text">Connecting…</span></div>
+      <div class="cinema-layout">
+        <div class="cinema-column">
+          <div id="stage" class="stage">
+            <div id="stage-empty" class="stage-empty"><div class="screen-icon" aria-hidden="true">▷</div><p id="stage-title">The best part is watching together.</p><span id="stage-description">Choose a movie below. Your person gets the front-row seat.</span></div>
+            <video id="local-movie" playsinline controls hidden></video>
+            <video id="screen-preview" playsinline autoplay muted hidden></video>
+            <video id="remote-movie" playsinline autoplay hidden></video>
+            <div class="stage-topline"><span id="movie-label">WAITING FOR THE OPENING SCENE</span><span id="sharing-badge" hidden>● &nbsp; SHARING</span></div>
+          </div>
+          <div class="playback-bar"><span id="source-caption">Your own private little cinema</span><div><button id="enable-sound" class="text-button" hidden>Enable sound</button><button id="fullscreen" class="text-button">Fullscreen ⛶</button></div></div>
+          <section id="host-tools" class="host-tools" hidden>
+            <div class="section-title"><h2>What are we watching?</h2><span>ONLY YOU SHARE THE MOVIE</span></div>
+            <div class="source-choices">
+              <button id="choose-file" class="source-card"><span class="source-symbol" aria-hidden="true">▤</span><strong>Play a movie file</strong><span>Picture + sound, right from Firefox.</span><span class="source-link">Choose a file →</span></button>
+              <button id="share-screen" class="source-card"><span class="source-symbol" aria-hidden="true">▣</span><strong>Share a window</strong><span>For VLC, your screen, or a browser.</span><span class="source-link">Share your screen →</span></button>
+            </div>
+            <input id="movie-file" type="file" accept="video/*,.mkv" hidden>
+            <div id="screen-audio-panel" class="audio-panel"><label for="movie-audio-input">Movie audio for screen sharing</label><div class="input-row"><select id="movie-audio-input"><option value="">Screen audio, if supported</option></select><button id="refresh-devices" class="text-button">Find devices ↻</button></div><p id="firefox-note">Firefox needs a separate movie-audio input for screen sharing. <button id="audio-help" class="inline-button">Set up BlackHole →</button></p></div>
+            <div class="source-footer"><span id="movie-audio-status">A local movie file is the simplest way to start.</span><button id="stop-sharing" class="danger-text" hidden>Stop sharing</button></div>
+          </section>
+          <div class="night-note"><span aria-hidden="true">✳</span><p>Headphones on. World off.<br><span>Keep voices clear and the movie all yours.</span></p><span class="night-number">NO. 001</span></div>
+        </div>
+        <aside class="people-column">
+          <section class="people-card"><div class="section-title"><h2>The two of you</h2><span>2 SEATS</span></div>
+            <div class="person-tile"><video id="remote-camera" playsinline autoplay muted hidden></video><div id="remote-avatar" class="avatar remote-avatar">✳</div><div class="person-caption"><span id="remote-name">Your person</span><span id="remote-presence">Waiting for them</span></div></div>
+            <div class="person-tile self-tile"><video id="local-camera" playsinline autoplay muted hidden></video><div id="local-avatar" class="avatar">◡</div><div class="person-caption"><span>You <span class="small-muted">(preview)</span></span><span id="self-status">Mic & camera off</span></div></div>
+            <div class="call-controls"><button id="toggle-mic" class="control-button" aria-pressed="false" disabled><span aria-hidden="true">♩</span><span id="mic-label">Mic off</span></button><button id="toggle-camera" class="control-button" aria-pressed="false" disabled><span aria-hidden="true">▣</span><span id="camera-label">Camera off</span></button></div>
+            <label class="device-label" for="voice-input">Your microphone</label><select id="voice-input"><option value="">Default microphone</option></select>
+          </section>
+          <section class="volume-card"><h2>Make yourself comfortable</h2><label for="movie-volume">Movie <span id="movie-volume-value">100%</span></label><input id="movie-volume" type="range" min="0" max="100" value="100"><label for="voice-volume">Their voice <span id="voice-volume-value">100%</span></label><input id="voice-volume" type="range" min="0" max="100" value="100"><p>These change only what you hear.</p></section>
+          <div id="invite-card" class="invite-card" hidden><span class="eyebrow">ONE SEAT RESERVED</span><p>Good movies need<br><em>good company.</em></p><button id="copy-invite-card" class="text-button">Copy their invite ↗</button><small>Keep this link between the two of you.</small></div>
+          <div id="guest-card" class="invite-card" hidden><span class="eyebrow">YOU’RE IN GOOD COMPANY</span><p>Settle in.<br><em>You’re invited.</em></p><small>The host controls the movie. Your mic and camera are always your choice.</small></div>
+        </aside>
+      </div>
+      <audio id="remote-voice" autoplay hidden></audio>
+    </section>
+    <div id="notice" class="notice" role="status" hidden><span id="notice-message"></span><button id="notice-dismiss" aria-label="Dismiss message">×</button></div>
+  </main>
+  <footer class="site-footer"><span>MADE FOR A NIGHT IN, TOGETHER.</span><span>Private invite · WebRTC · Powered by <a href="https://vdo.ninja/" target="_blank" rel="noopener noreferrer">VDO.Ninja</a></span></footer>
+  <dialog id="help-dialog"><div class="dialog-heading"><span class="eyebrow">A QUICK GUIDE</span><button id="help-close" class="text-button" aria-label="Close guide">×</button></div><h2>A little setup.<br>A whole movie night.</h2>
+    <h3>Start with a movie file</h3><p>On your Mac in Firefox, start a room, copy the invite, and choose a local movie file. MP4 with H.264 video and AAC audio is a good first choice. Use the player’s play, pause, and seek controls. The file stays on your device; live picture and sound go to your guest. Files your browser cannot decode need VLC + screen sharing instead.</p>
+    <h3>Share Firefox or VLC with movie audio</h3><ol><li>Install the free <a href="https://existential.audio/blackhole/" target="_blank" rel="noopener noreferrer">BlackHole 2ch driver</a>.</li><li>For VLC, open Preferences → Audio and choose BlackHole 2ch as VLC’s audio output. Keep your Mac’s normal output on your headphones so your guest’s voice does not get sent back.</li><li>In this app, click “Find devices”, grant input access, then choose BlackHole 2ch under “Movie audio for screen sharing”. Keep your real microphone selected under “Your microphone”.</li><li>Click “Share a window”, select the movie window, and allow screen recording for Firefox in macOS System Settings if requested.</li><li>To hear VLC locally too, create a Multi-Output Device with BlackHole + your headphones and select it in VLC only. Keep the system output on headphones. <a href="https://github.com/ExistentialAudio/BlackHole/wiki/Multi-Output-Device" target="_blank" rel="noopener noreferrer">BlackHole setup guide ↗</a></li></ol>
+    <p class="help-note">Sharing movie audio from another Firefox tab needs application-specific routing (for example OBS application audio capture into BlackHole). Sending all Mac sound to BlackHole also sends your guest’s voice back, causing echo. The local-file option avoids this setup.</p>
+    <h3>Your guest</h3><p>They open the invite in Chrome on Windows or Android and tap “Join movie night”. They can turn their microphone and camera on independently. Keep the browser open and the phone unlocked; backgrounding Chrome may interrupt playback or the call. On a phone, use landscape fullscreen for the movie.</p>
+    <h3>Privacy & connection</h3><p>One host and one guest are supported in this first version. Anyone with the full invite can join, so share it privately. Roles are for a trusted pair, not account authentication. Create a new room to get a new invite. Media is encrypted in transit using WebRTC. VDO.Ninja supplies hosted signaling and, when needed, relay servers; availability and service limits apply. Direct peers can learn each other’s network addresses.</p>
+    <p>Mic and camera start off. Leaving stops all captures. Protected streaming services may block picture or sound. Screen sharing adds network delay; you and your guest may see reactions slightly apart.</p>
+    <h3>If something is quiet or stuck</h3><p>Tap “Enable sound” if the browser blocked playback. Make sure BlackHole receives the movie, use headphones, and check the movie and voice volume sliders. If the connection fails after a network change, leave and re-open the same invite. Both people must use the same current app version.</p>
+  </dialog>
+  <dialog id="join-dialog"><p class="eyebrow">YOUR SEAT IS SAVED</p><h2>Make yourself<br><em>at home.</em></h2><p>You’ll see the movie your host shares. Your microphone and camera start off.</p><button id="accept-invite" class="primary large">Join movie night →</button></dialog>
+</body>
+</html>

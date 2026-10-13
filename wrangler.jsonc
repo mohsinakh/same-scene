@@ -1,0 +1,6 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "same-scene",
+  "compatibility_date": "2026-10-13",
+  "assets": { "directory": "./dist" }
+}
