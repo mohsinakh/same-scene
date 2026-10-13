@@ -53,6 +53,8 @@ Guest invites and host links have no built-in expiry. Closing or leaving ends ca
 
 Open the full invite in Chrome and tap **Join movie night**. Permissions are requested only when turning on mic/camera. If autoplay is blocked, tap **Enable sound**. Keep Chrome foregrounded and the device unlocked. Android guests do not need screen-capture support because they only receive the movie. Headphones reduce microphone echo.
 
+The corner-rectangle fullscreen button expands the whole movie player, including movie volume, mute, voice volume and the exit button. Controls and the title hide after three seconds without pointer, touch or keyboard activity; moving the pointer or tapping the movie brings them back. Keyboard users keep controls visible while focused on them. With the player focused, **F** toggles fullscreen, **M** toggles movie mute and **↑/↓** adjust movie volume. Double-click the received movie to toggle fullscreen. On touch devices the app requests landscape orientation after entering fullscreen and releases the lock on exit. If the browser declines the lock, fullscreen continues with a rotate-phone hint; actual device support varies.
+
 ## Hosting for free
 
 `npm run build` emits a standalone `dist/` folder with relative paths, suitable for a GitHub Pages repository subpath or Cloudflare static assets.

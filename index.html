@@ -42,6 +42,7 @@
       <div id="connection-status" class="connection-status" role="status"><span class="tiny-dot"></span><span id="connection-text">Connecting…</span></div>
       <div class="cinema-layout">
         <div class="cinema-column">
+          <div id="movie-player" class="movie-player" tabindex="0" role="region" aria-label="Movie player">
           <div id="stage" class="stage">
             <div id="stage-empty" class="stage-empty"><div class="screen-icon" aria-hidden="true">▷</div><p id="stage-title">The best part is watching together.</p><span id="stage-description">Choose a movie below. Your person gets the front-row seat.</span></div>
             <video id="local-movie" playsinline controls hidden></video>
@@ -49,14 +50,16 @@
             <video id="remote-movie" playsinline autoplay hidden></video>
             <div class="stage-topline"><span id="movie-label">WAITING FOR THE OPENING SCENE</span><span id="sharing-badge" hidden>● &nbsp; SHARING</span></div>
           </div>
-          <div class="player-controls" aria-label="Player controls">
+          <div id="player-controls" class="player-controls" aria-label="Player controls">
             <button id="mute-movie" aria-label="Mute or unmute movie sound" class="player-button" aria-pressed="false" title="Mute movie for yourself">♫ <span id="mute-movie-label">Movie sound</span></button>
             <label class="player-volume" for="movie-volume"><span class="sr-only">Movie volume</span><input id="movie-volume" type="range" min="0" max="100" value="100"><span id="movie-volume-value">100%</span></label>
-            <span class="live-tag">LIVE</span><div class="player-spacer"></div>
+            <label class="fullscreen-voice-volume" for="fullscreen-voice-volume">Their voice <input id="fullscreen-voice-volume" type="range" min="0" max="100" value="100" aria-label="Their voice volume"></label><span class="live-tag">LIVE</span><div class="player-spacer"></div>
             <button id="enable-sound" class="primary" hidden>Enable sound</button>
             <button id="theater" aria-label="Toggle wide view" class="player-button" aria-pressed="false">▭ <span>Wide view</span></button>
             <button id="pip" aria-label="Open floating movie player" class="player-button" hidden>▣ <span>Pop out</span></button>
-            <button id="fullscreen" aria-label="Toggle fullscreen" class="player-button">⛶ <span>Fullscreen</span></button>
+            <button id="fullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)" class="player-button" aria-pressed="false"><svg class="fullscreen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path class="expand-icon" d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/><path class="collapse-icon" d="M3 8h5V3m8 0v5h5M8 21v-5H3m13 5v-5h5"/></svg><span id="fullscreen-label">Fullscreen</span></button>
+          </div>
+          <p id="fullscreen-tip" class="fullscreen-tip" hidden></p>
           </div>
           <div class="playback-bar"><span id="source-caption">Choose something to watch</span><span id="playback-hint">You control playback in the movie window.</span></div>
           <section id="host-tools" class="host-tools" hidden>

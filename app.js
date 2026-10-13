@@ -325,6 +325,7 @@ function applyVolumes() {
   $('deafen').setAttribute('aria-pressed', String(state.deafened));
   $('deafen').textContent = state.deafened ? 'Unmute incoming sound' : 'Mute incoming sound';
   $('movie-volume-value').textContent = `${$('movie-volume').value}%`;
+  $('fullscreen-voice-volume').value = $('voice-volume').value;
   $('voice-volume-value').textContent = `${$('voice-volume').value}%`;
 }
 function sharingUI(movie) {
@@ -455,6 +456,8 @@ async function shareScreen() {
 async function leave(clearURL = true) {
   if (state.leaving) return;
   state.leaving = true;
+  if (playerFullscreen()) { try { await document.exitFullscreen(); } catch {} }
+  clearTimeout(controlsTimer);
   state.joined = false;
   clearInterval(state.heartbeat);
   $('toggle-mic').disabled = $('toggle-camera').disabled = true;
@@ -528,11 +531,87 @@ $('enable-sound').addEventListener('click', async () => {
   try { await Promise.all(elements.map(e => e.play())); $('enable-sound').hidden = true; }
   catch { notice('Playback is still blocked. Tap again and check your browser’s autoplay permissions.', true); }
 });
-$('fullscreen').addEventListener('click', async () => {
+// Fullscreen the whole player so sound controls remain available over the movie.
+const player = $('movie-player');
+let controlsTimer, keyboardControls = false, draggingControl = false, orientationRequested = false;
+function playerFullscreen() { return document.fullscreenElement === player; }
+function revealPlayerControls() {
+  clearTimeout(controlsTimer);
+  player.classList.remove('controls-idle');
+  if (!playerFullscreen()) return;
+  controlsTimer = setTimeout(() => {
+    if (draggingControl || (keyboardControls && $('player-controls').contains(document.activeElement)) || !$('enable-sound').hidden) return;
+    player.classList.add('controls-idle');
+  }, 3000);
+}
+async function toggleFullscreen() {
   try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await $('stage').requestFullscreen();
+    if (playerFullscreen()) { await document.exitFullscreen(); return; }
+    $('fullscreen-tip').hidden = true;
+    await player.requestFullscreen({ navigationUI: 'hide' });
+    if (navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) <= 1024 && playerFullscreen()) {
+      try {
+        if (!screen.orientation?.lock) throw new Error('Orientation lock unavailable');
+        orientationRequested = true;
+        await screen.orientation.lock('landscape');
+        if (!playerFullscreen()) screen.orientation.unlock();
+      } catch {
+        if (playerFullscreen()) {
+          $('fullscreen-tip').textContent = 'Rotate your phone to landscape if it does not turn automatically.';
+          $('fullscreen-tip').hidden = false;
+        }
+      }
+    }
   } catch { notice('Fullscreen is unavailable in this browser. Try rotating your device to landscape.'); }
+}
+$('fullscreen').addEventListener('click', event => {
+  keyboardControls = event.detail === 0;
+  if (!keyboardControls) $('fullscreen').blur();
+  void toggleFullscreen();
+});
+document.addEventListener('fullscreenchange', () => {
+  const active = playerFullscreen();
+  player.classList.toggle('is-fullscreen', active);
+  $('fullscreen').setAttribute('aria-pressed', String(active));
+  $('fullscreen').setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+  $('fullscreen-label').textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+  $('fullscreen').title = active ? 'Exit fullscreen (F or Esc)' : 'Fullscreen (F)';
+  if (!active) $('fullscreen-tip').hidden = true;
+  if (!active && orientationRequested) {
+    try { screen.orientation?.unlock(); } catch { /* The browser may already unlock on exit. */ }
+    orientationRequested = false;
+  }
+  revealPlayerControls();
+});
+player.addEventListener('pointermove', () => { keyboardControls = false; revealPlayerControls(); });
+player.addEventListener('pointerdown', event => {
+  keyboardControls = false;
+  draggingControl = $('player-controls').contains(event.target);
+  revealPlayerControls();
+});
+for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, () => {
+  if (draggingControl) { draggingControl = false; revealPlayerControls(); }
+});
+player.addEventListener('focusin', revealPlayerControls);
+player.addEventListener('dblclick', event => {
+  if (event.target.closest('button, input, .player-controls') || event.target === $('local-movie')) return;
+  void toggleFullscreen();
+});
+player.addEventListener('keydown', event => {
+  keyboardControls = true;
+  revealPlayerControls();
+  if (event.target.closest('input, select, button') || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.key.toLowerCase() === 'f') { event.preventDefault(); void toggleFullscreen(); }
+  if (event.key.toLowerCase() === 'm') { event.preventDefault(); if (!$('mute-movie').disabled) $('mute-movie').click(); }
+  if (['ArrowUp', 'ArrowDown'].includes(event.key) && !$('movie-volume').disabled) {
+    event.preventDefault();
+    $('movie-volume').value = Math.max(0, Math.min(100, Number($('movie-volume').value) + (event.key === 'ArrowUp' ? 5 : -5)));
+    applyVolumes();
+  }
+});
+$('fullscreen-voice-volume').addEventListener('input', () => {
+  $('voice-volume').value = $('fullscreen-voice-volume').value;
+  applyVolumes();
 });
 for (const id of ['help-open', 'audio-help']) $(id).addEventListener('click', showHelp);
 $('help-close').addEventListener('click', () => $('help-dialog').close());
